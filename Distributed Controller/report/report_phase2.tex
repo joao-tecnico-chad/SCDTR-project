@@ -1,0 +1,221 @@
+\documentclass[10pt,twocolumn]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.8cm]{geometry}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{caption}
+\usepackage{hyperref}
+\usepackage{float}
+\usepackage{enumitem}
+\usepackage{multicol}
+\usepackage{array}
+
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{0.5em}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\begin{document}
+
+\twocolumn[{%
+\begin{center}
+\vspace{0.5cm}
+\includegraphics[scale=0.25]{../Local Luminaire Controller/report/IST_Logo.png}\\[0.5cm]
+\textsc{\Large Distributed Real-Time Control Systems}\\[0.4cm]
+\textsc{\large Master's in Electrical and Computer Engineering}\\[0.6cm]
+\HRule\\[0.2cm]
+{\normalsize \bf Final Report --- Distributed Cooperative Illumination Control}\\[0.1cm]
+\HRule\\[0.4cm]
+\begin{minipage}{0.45\textwidth}
+\centering
+\emph{Author:}\\
+Jo\~{a}o Rocha -- \texttt{ISTID}
+\end{minipage}\\[0.5cm]
+{\small Instituto Superior T\'{e}cnico -- \today}
+\vspace{0.6cm}
+\end{center}
+}]
+
+% ===================================================================
+\section{Introduction}
+
+This report describes the design and implementation of a distributed cooperative illumination control system.
+Building on the local PI controller developed in Phase~1, Phase~2 adds CAN-BUS networking between three luminaire nodes, a hub function for PC interfacing, coordinated system calibration, and three distributed optimisation algorithms: consensus, dual decomposition, and ADMM.
+
+The objective is to minimise global energy consumption while maintaining illuminance above desk-specific thresholds, considering both self and cross-coupling effects between luminaires.
+
+% ===================================================================
+\section{System Architecture}
+
+\subsection{Hardware Setup}
+
+Three RPI Pico W microcontrollers, each driving an LED and reading an LDR, are connected via CAN-BUS using MCP2515 modules.
+One node, connected to the PC via USB serial, acts as the hub, bridging PC commands to the CAN network.
+
+% TODO: Insert figure of box setup with 3 luminaires
+% \begin{figure}[H]
+% \centering
+% \includegraphics[width=\columnwidth]{figures/system_photo.png}
+% \caption{Assembled office illumination model with three luminaires.}
+% \label{fig:system}
+% \end{figure}
+
+\subsection{Software Architecture}
+
+All nodes run identical firmware. The RP2040 dual-core architecture is exploited:
+
+\begin{itemize}[nosep]
+  \item \textbf{Core~1}: Local PI control loop at 100\,Hz (same as Phase~1).
+  \item \textbf{Core~0}: Serial/CAN message handling, hub function, and distributed algorithm iteration at 10\,Hz.
+\end{itemize}
+
+The distributed algorithm computes optimal duty cycles, which feed into the local PI controller as illuminance references.
+
+% ===================================================================
+\section{CAN-BUS Communication}
+
+Messages use the standard CAN frame format (11-bit arbitration ID, 8-byte payload).
+The arbitration ID encodes the sender and message type:
+\[
+  \text{ID} = (\text{sender} \ll 4) \;\mathbin{|}\; \text{msg\_type}
+\]
+
+Message types include boot announcements, calibration data, duty/reference updates, and hub commands.
+
+% ===================================================================
+\section{Network Boot \& Calibration}
+
+\subsection{Node Discovery}
+
+On power-up, each node broadcasts its unique hardware ID (from the Pico flash) for 3\,s.
+All discovered IDs are sorted deterministically; the rank in the sorted list becomes the logical ID (1--3).
+This ensures identical ID assignment regardless of boot order.
+
+\subsection{System Calibration}
+
+After boot, a coordinated calibration sequence measures the gain matrix $\mathbf{K}$ and background vector $\mathbf{o}$:
+
+\begin{enumerate}[nosep]
+  \item All LEDs off: measure background $o_i$ at each node.
+  \item Turn on node~$j$ at full duty, others off: measure $K_{ij}$ at all nodes.
+  \item Repeat for each node.
+\end{enumerate}
+
+The system model is:
+\begin{equation}
+  \mathbf{L} = \mathbf{K} \cdot \mathbf{d} + \mathbf{o}
+  \label{eq:model}
+\end{equation}
+where $\mathbf{L}$ is the illuminance vector, $\mathbf{d}$ the duty cycle vector, and $\mathbf{o}$ the external illuminance.
+
+% TODO: Insert measured K matrix
+% \begin{table}[H]
+% \centering
+% \caption{Measured gain matrix (lux per unit duty).}
+% \begin{tabular}{cccc}
+% \toprule
+%  & Node 1 & Node 2 & Node 3 \\
+% \midrule
+% Node 1 & K11 & K12 & K13 \\
+% Node 2 & K21 & K22 & K23 \\
+% Node 3 & K31 & K32 & K33 \\
+% \bottomrule
+% \end{tabular}
+% \label{tab:K}
+% \end{table}
+
+% ===================================================================
+\section{Distributed Control Algorithms}
+
+The optimisation problem is:
+\begin{equation}
+  \min_{\mathbf{d}} \sum_{i=1}^{N} c_i \, d_i
+  \quad \text{s.t.} \quad
+  \mathbf{K}\mathbf{d} + \mathbf{o} \geq \mathbf{L}_{\text{ref}}, \;
+  0 \leq d_i \leq 1
+  \label{eq:opt}
+\end{equation}
+where $c_i$ is the energy cost coefficient for luminaire~$i$.
+
+Three algorithms are implemented, switchable at runtime via serial command.
+
+\subsection{Consensus}
+
+Each node solves a local subproblem incorporating a penalty term for deviating from the network average.
+Duty cycle proposals are exchanged via CAN-BUS and averaged each iteration.
+Convergence is typically achieved in 10--50 iterations.
+
+\subsection{Dual Decomposition}
+
+The constraints are relaxed using Lagrange multipliers $\lambda_i$.
+Each node updates its duty by minimising the local Lagrangian; multipliers are updated via subgradient ascent.
+A decaying step size $\alpha$ ensures convergence.
+
+\subsection{ADMM}
+
+ADMM splits the problem into local d-updates, a global z-projection onto the constraint set, and dual u-updates.
+The penalty parameter $\rho$ controls the trade-off between primal and dual convergence.
+
+% ===================================================================
+\section{Results}
+
+\subsection{Algorithm Convergence}
+
+% TODO: Insert convergence plots
+% \begin{figure}[H]
+% \centering
+% \includegraphics[width=\columnwidth]{figures/convergence_comparison.png}
+% \caption{Convergence of the three algorithms (iterations vs.\ cost).}
+% \label{fig:convergence}
+% \end{figure}
+
+\subsection{Equal Energy Costs}
+
+% TODO: Insert results for c_i = 1 for all nodes
+% Duty cycles, measured illuminance, energy, visibility error, flicker
+
+\subsection{Different Energy Costs}
+
+% TODO: Insert results for c_1=1, c_2=2, c_3=3
+% Verify cheaper nodes take more load
+
+\subsection{Occupation Changes}
+
+% TODO: Insert step response plots for occupation transitions
+
+\subsection{Disturbance Rejection}
+
+% TODO: Insert disturbance response plots
+% Compare cooperative vs local-only
+
+\subsection{Performance Comparison}
+
+% TODO: Insert comparison table
+% \begin{table}[H]
+% \centering
+% \caption{Algorithm comparison (all occupied, equal costs).}
+% \begin{tabular}{lccc}
+% \toprule
+% Metric & Consensus & Dual Decomp. & ADMM \\
+% \midrule
+% Energy (J) & -- & -- & -- \\
+% Visibility (lux) & -- & -- & -- \\
+% Flicker ($\text{s}^{-1}$) & -- & -- & -- \\
+% Iterations & -- & -- & -- \\
+% \bottomrule
+% \end{tabular}
+% \label{tab:comparison}
+% \end{table}
+
+% ===================================================================
+\section{Conclusions}
+
+% TODO: Summarise findings
+% - Which algorithm performed best overall?
+% - Trade-offs: convergence speed vs solution quality
+% - Effect of cost coefficients
+% - Robustness to disturbances
+% - Comparison with local-only control
+
+\end{document}

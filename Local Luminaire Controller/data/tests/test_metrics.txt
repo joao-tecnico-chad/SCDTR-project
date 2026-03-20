@@ -1,0 +1,8 @@
+# Steady-state metrics after 60s at HIGH
+g E 1 -> E 1 179.4004
+g V 1 -> V 1 0.0421
+g F 1 -> F 1 0.000162
+g y 1 -> y 1 40.13
+g u 1 -> u 1 0.5641
+g t 1 -> t 1 5929.32
+g p 1 -> p 1 0.5674
