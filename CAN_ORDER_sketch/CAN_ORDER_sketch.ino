@@ -199,6 +199,7 @@ struct CalibrationContext {
   bool gainsReady = false;
   float measureAccumulator = 0.0f;
   uint16_t measureCount = 0;
+  uint32_t startMs = 0;
 };
 
 struct PendingRemoteQuery {
@@ -284,7 +285,7 @@ enum AlgorithmMode : uint8_t { ALG_NONE = 0, ALG_CONSENSUS = 1, ALG_ADMM = 2, AL
 const int CONS_MAX_NODES = 3;
 const int CONS_MAX_ITER = 50;
 const float CONS_TOL = 1e-3f;
-const float CONS_RHO = 10.0f;
+const float CONS_RHO = 2.0f;
 const uint32_t CONSENSUS_PERIOD_MS = 100;
 const uint16_t CAN_ID_CONSENSUS_BASE = 0x700;
 const uint16_t CAN_ID_GAINEXCH_BASE = 0x680;
@@ -365,16 +366,17 @@ void solveLocalConsensus() {
     if (j != i) cons.d[j] = cons.d_avg[j];
   }
 
-  // Local illuminance constraint: K[i][i]*d[i] + cross_coupling + o[i] >= L_ref[i]
-  float lux_others = cons.o[i];
-  for (int j = 0; j < cons.numNodes; j++) {
-    if (j != i) lux_others += cons.K[i][j] * cons.d_avg[j];
-  }
-
-  // Minimum duty to meet own constraint
+  // Check ALL nodes' constraints to find minimum d[i]
   float d_min = 0.0f;
-  if (cons.K[i][i] > 0.0f) {
-    d_min = (cons.L_ref[i] - lux_others) / cons.K[i][i];
+  for (int k = 0; k < cons.numNodes; k++) {
+    float lux_k = cons.o[k];
+    for (int j = 0; j < cons.numNodes; j++) {
+      if (j != i) lux_k += cons.K[k][j] * cons.d_avg[j];
+    }
+    if (cons.K[k][i] > 0.0f) {
+      float d_needed = (cons.L_ref[k] - lux_k) / cons.K[k][i];
+      if (d_needed > d_min) d_min = d_needed;
+    }
   }
   if (d_min < 0.0f) d_min = 0.0f;
 
@@ -1332,6 +1334,9 @@ void finishCalibration() {
   }
 
   calib.gainsReady = true;
+  Serial.print("Calibration complete in ");
+  Serial.print(millis() - calib.startMs);
+  Serial.println(" ms");
 }
 
 void startCalibrationSession(uint16_t sessionId,
@@ -1948,6 +1953,7 @@ void serviceCalibrationStateMachine() {
         return;  // Stay responsive to CAN/UI while waiting for this node's locally scheduled start instant.
       }
       setLedPwm(0);
+      calib.startMs = now;
       enterCalibrationState(CAL_BASELINE_SETTLE, now + calib.settleMs);
       break;
 
@@ -2350,6 +2356,15 @@ void handleLineCommand(const char *line) {
     sendSimpleCommand(BROADCAST_NODE, CMD_RESTART);
     resetRuntimeState();
     printAck();
+    return;
+  }
+
+  if (strcmp(line, "RM") == 0) {
+    energyJ = 0.0f;
+    visibilityErrorIntegral = 0.0f;
+    flickerIntegral = 0.0f;
+    metricSampleCount = 0;
+    Serial.println("Metrics reset.");
     return;
   }
 

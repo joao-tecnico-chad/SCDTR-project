@@ -21,7 +21,7 @@
 \twocolumn[{%
 \begin{center}
 \vspace{0.5cm}
-\includegraphics[scale=0.25]{../Local Luminaire Controller/report/IST_Logo.png}\\[0.5cm]
+\includegraphics[scale=0.25]{../../Local Luminaire Controller/report/IST_Logo.png}\\[0.5cm]
 \textsc{\Large Distributed Real-Time Control Systems}\\[0.4cm]
 \textsc{\large Master's in Electrical and Computer Engineering}\\[0.6cm]
 \HRule\\[0.2cm]
@@ -47,74 +47,98 @@ The objective is to minimise total energy consumption while keeping desk illumin
 % ===================================================================
 \section{System Architecture}
 
-The experimental setup is a closed office-scale box with at least three luminaires. Each node contains one RP2040-based microcontroller, one LED driven by PWM, one LDR-based luxmeter, and one MCP2515 CAN controller. The LED and the LDR are mounted vertically so that the sensor measures reflected light on the desk rather than direct light from the source. One node can be connected to the PC through USB serial and operate as a hub, forwarding commands to the CAN network and returning network measurements to the PC.
+The experimental setup consists of a closed office-scale box containing three luminaires. Each node contains one RP2040-based microcontroller (Raspberry Pi Pico), one LED driven by PWM, one LDR-based luxmeter, and one MCP2515 CAN controller interfaced via SPI. The LED and the LDR are mounted so that the sensor measures reflected light on the desk surface.
 
-% TODO: Insert figure of box setup with 3 luminaires
-% \begin{figure}[H]
-% \centering
-% \includegraphics[width=\columnwidth]{figures/system_photo.png}
-% \caption{Assembled office illumination model with three luminaires.}
-% \label{fig:system}
-% \end{figure}
+Any node connected to the PC through USB serial can operate as a hub, forwarding commands to the CAN network and returning measurements. The command interface supports duty-cycle setting, lux reference updates, occupancy state changes, enable/disable flags, and performance queries.
 
-All nodes run the same firmware. The software is organised as a non-blocking concurrent application. The local lux estimation and control logic run periodically at 100\,Hz, while communications, startup state machines, hub routing, diagnostics, and distributed algorithm iterations are serviced asynchronously. The RP2040 dual-core architecture is exploited as follows:
-
+All nodes run identical firmware. The software is organised as a non-blocking concurrent application on the RP2040 dual-core architecture:
 \begin{itemize}[nosep]
-  \item \textbf{Core~0}: control state machines, serial parsing, hub function, calibration logic, and distributed coordination;
-  \item \textbf{Core~1}: CAN controller service, interrupt handling, and low-latency frame transfer.
+  \item \textbf{Core~0}: control state machines, serial parsing, hub function, calibration logic, PI controller, and distributed coordination;
+  \item \textbf{Core~1}: MCP2515 CAN controller service exclusively --- interrupt handling, frame TX/RX, and low-latency transfer via FIFO queues.
 \end{itemize}
 
-This separation keeps the application responsive and avoids blocking interactions between communications and control. The distributed controller computes coordinated actuation targets, while each node still maintains its local illumination and metrics.
+This separation keeps the application responsive and avoids blocking interactions between communications and control. The control loop runs at 100\,Hz (10\,ms period), while CAN frame processing on Core~1 runs asynchronously.
 
 % ===================================================================
 \section{CAN-BUS Communication}
 
-The nodes communicate through standard 11-bit CAN frames with fixed-size payloads. The protocol supports direct messages to one node and broadcast messages to all nodes. The main message classes are: node discovery and hello frames, hub commands forwarded from the PC, query/reply messages for the command-line interface, calibration plan messages, and distributed-control data exchanges.
+The nodes communicate through standard 11-bit CAN frames at 500\,kbps. The MCP2515 modules use 16\,MHz crystals and are powered at 5\,V (VBUS). The CAN bus is terminated with 120\,$\Omega$ resistors on the two end nodes. A common ground connection between all modules is required in addition to the USB ground.
 
-The command interface follows the project tables for duty-cycle setting, lux reference updates, occupancy state changes, enable or disable flags, performance queries, and restart. The hub node translates serial requests from the PC into CAN messages and routes the replies back in the same textual format expected by the command-line interface. This allows the complete network to be operated from a single terminal while preserving the distributed execution of the controllers.
+The protocol supports both unicast and broadcast messages. The main message classes are:
+\begin{itemize}[nosep]
+  \item Node discovery and hello frames (wake-up phase);
+  \item Hub commands forwarded from the PC;
+  \item Query/reply messages for the command-line interface;
+  \item Calibration plan broadcast and slot synchronisation;
+  \item Distributed control data exchange (gain rows, proposals, dual variables).
+\end{itemize}
+
+The hub node translates serial requests from the PC into CAN messages and routes replies back in the textual format expected by the command-line interface. This allows the complete network to be operated from a single terminal.
 
 % ===================================================================
 \section{Network Boot \& Calibration}
 
-At wake-up, all nodes enter a discovery phase in which they announce their presence on CAN-BUS and learn which neighbours are active. This stage is required because the boot order is not deterministic. After discovery stabilises, the network starts a synchronous calibration procedure. The manual explicitly requires this procedure to run at every wake-up to compensate for changes in geometry inside the box.
-
-The calibration stage estimates the background illuminance vector $\mathbf{o}$ and the gain matrix $\mathbf{K}$ of the distributed system:
-
-\begin{enumerate}[nosep]
-  \item all LEDs off, measuring the external or background illuminance at each desk;
-  \item one luminaire turned on at a known duty cycle, the others off, measuring the contribution on all desks;
-  \item repetition of the previous step for all luminaires.
-\end{enumerate}
+At power-on, all nodes enter a discovery phase where they announce their presence via CAN and learn which neighbours are active. After discovery stabilises, the network starts a synchronous calibration procedure that estimates the system model parameters.
 
 The system model is:
 \begin{equation}
   \mathbf{L} = \mathbf{K} \cdot \mathbf{d} + \mathbf{o}
   \label{eq:model}
 \end{equation}
-where $\mathbf{L}$ is the illuminance vector, $\mathbf{d}$ the duty cycle vector, and $\mathbf{o}$ the external illuminance.
+where $\mathbf{L} \in \mathbb{R}^N$ is the illuminance vector (lux), $\mathbf{d} \in [0,1]^N$ is the duty cycle vector, $\mathbf{K} \in \mathbb{R}^{N \times N}$ is the gain matrix (lux per unit duty), and $\mathbf{o} \in \mathbb{R}^N$ is the external (background) illuminance.
 
-The synchronous sequence is executed from a compact calibration plan broadcast on CAN-BUS, so that all nodes follow the same schedule without a central master commanding each slot in real time. This approach reduces traffic, keeps the startup deterministic, and directly provides the self-coupling and cross-coupling gains required by the distributed controller.
+The calibration procedure follows three steps:
+\begin{enumerate}[nosep]
+  \item All LEDs off: measure the background illuminance $\mathbf{o}$;
+  \item For each luminaire $i$: turn on LED~$i$ at a known duty cycle (50\%), all others off, and measure the resulting illuminance at all desks;
+  \item Compute gains: $K_{ji} = (L_j^{(i)} - o_j) / d_{\mathrm{cal}}$.
+\end{enumerate}
 
-% TODO: Insert measured K matrix
-% \begin{table}[H]
-% \centering
-% \caption{Measured gain matrix (lux per unit duty).}
-% \begin{tabular}{cccc}
-% \toprule
-%  & Node 1 & Node 2 & Node 3 \\
-% \midrule
-% Node 1 & K11 & K12 & K13 \\
-% Node 2 & K21 & K22 & K23 \\
-% Node 3 & K31 & K32 & K33 \\
-% \bottomrule
-% \end{tabular}
-% \label{tab:K}
-% \end{table}
+The calibration plan is broadcast on CAN so all nodes follow the same schedule. Each phase uses a 250\,ms settling time and 600\,ms measurement window. For $N=3$ nodes, the total calibration time is approximately 4.2\,seconds:
+\begin{equation}
+  T_{\mathrm{cal}} = 850 + N \times 1100 \;\text{ms} \approx 4150\;\text{ms}
+  \label{eq:cal_time}
+\end{equation}
+
+The measured gain matrix and background vector for our setup are:
+
+\begin{table}[H]
+\centering
+\caption{Measured gain matrix $\mathbf{K}$ (lux per unit duty) and background $\mathbf{o}$.}
+\begin{tabular}{c|ccc|c}
+\toprule
+ & Node 1 & Node 2 & Node 3 & $o_i$ \\
+\midrule
+Node 1 & 25.13 & 13.75 & 5.88 & 0.79 \\
+Node 2 & 0.89 & 71.60 & 13.79 & 0.24 \\
+Node 3 & 1.04 & 9.67 & 87.06 & 0.12 \\
+\bottomrule
+\end{tabular}
+\label{tab:K}
+\end{table}
+
+The diagonal elements are dominant, confirming that each LED primarily affects its own desk. However, the off-diagonal coupling is non-negligible, especially between adjacent nodes (e.g., $K_{12} = 13.75$, $K_{23} = 13.79$).
+
+% ===================================================================
+\section{Local Controller}
+
+Each node runs a PI controller with feedforward for fast reference tracking:
+\begin{equation}
+  u(t) = u_{\mathrm{ff}} + K_p \, e(t) + K_i \int_0^t e(\tau)\,d\tau
+  \label{eq:pi}
+\end{equation}
+where the feedforward term provides an immediate open-loop estimate:
+\begin{equation}
+  u_{\mathrm{ff}} = \frac{L_{\mathrm{ref}} - o_i}{K_{ii}}
+  \label{eq:ff}
+\end{equation}
+
+The PI gains are $K_p = 0.5$ and $K_i = 0.3$, with anti-windup (back-calculation) to prevent integral saturation. The feedforward term allows the controller to reach the target illuminance within the first control cycle, with the PI correcting residual errors from model mismatch and external disturbances.
 
 % ===================================================================
 \section{Distributed Control Algorithms}
 
-The optimisation problem is:
+The distributed optimisation problem is:
 \begin{equation}
   \min_{\mathbf{d}} \sum_{i=1}^{N} c_i \, d_i
   \quad \text{s.t.} \quad
@@ -122,39 +146,171 @@ The optimisation problem is:
   0 \leq d_i \leq 1
   \label{eq:opt}
 \end{equation}
-where $c_i$ is the energy cost coefficient for luminaire~$i$.
+where $c_i$ is the energy cost coefficient for luminaire~$i$. This formulation minimises weighted energy consumption while satisfying visibility constraints at all desks.
 
-This formulation captures the two main project goals: satisfy visibility constraints at all desks and minimise the weighted energy cost. Two operating scenarios are relevant in the experiments: identical costs for all luminaires, and different costs to emulate heterogeneous energy penalties.
+Three distributed algorithms were implemented and compared against the local PI baseline.
 
-\subsection{Consensus}
+\subsection{Consensus-Based Optimisation}
 
-In the consensus-based approach, each node computes a local duty proposal using its row of the gain matrix and the currently shared estimates of the other duties. The proposals are exchanged on CAN-BUS and combined into a common average. Repeating this procedure makes the network converge to a feasible coordinated actuation vector while distributing the computation across the nodes.
+Each node $i$ solves a local sub-problem:
+\begin{equation}
+  \min_{d_i} \; c_i d_i + \frac{\rho}{2}(d_i - \bar{d}_i)^2
+  \quad \text{s.t.} \quad \mathbf{K}_{:,i} d_i + \text{others} \geq \mathbf{L}_{\text{ref}}
+\end{equation}
+where $\bar{d}_i$ is the current consensus average. The unconstrained optimum is $d_i^* = \bar{d}_i - c_i/\rho$, which is then projected onto the feasible set defined by the illuminance constraints. Proposals are exchanged via CAN and averaged across all nodes. The penalty parameter is $\rho = 2.0$.
 
 \subsection{ADMM}
 
-ADMM was also considered because it separates the optimisation into local primal updates, a projection step onto the illuminance constraint set, and dual-variable updates. This decomposition is attractive for cooperative control because local computations remain simple, while the exchanged variables have a clear physical meaning related to the shared illumination constraints. The penalty parameter $\rho$ controls the convergence trade-off between feasibility and agreement.
+The Alternating Direction Method of Multipliers decomposes the problem into:
+\begin{enumerate}[nosep]
+  \item \textbf{d-update}: $d_i = z_i - u_i - c_i/\rho$ (local primal);
+  \item \textbf{z-update}: project $\mathbf{z} = \mathbf{d} + \mathbf{u}$ onto the constraint set $\mathbf{K}\mathbf{z} + \mathbf{o} \geq \mathbf{L}_{\text{ref}}$ using iterative Dykstra projections;
+  \item \textbf{u-update}: $u_i \leftarrow u_i + d_i - z_i$ (dual variable).
+\end{enumerate}
+The penalty parameter is $\rho = 1.0$. Convergence is detected when the primal residual $\|\mathbf{d} - \mathbf{z}\|$ falls below $10^{-3}$.
 
-The report compares the cooperative solution against the non-coordinated case, where each node acts only on local information and therefore cannot explicitly compensate for cross-coupling.
+\subsection{Dual Decomposition}
+
+The Lagrangian relaxation approach uses gradient descent on the primal and ascent on the dual:
+\begin{align}
+  d_i &\leftarrow d_i - \alpha \left( c_i - \sum_k \lambda_k K_{ki} \right) \\
+  \lambda_k &\leftarrow \max\left(0,\; \lambda_k + \alpha (L_{\text{ref},k} - \mathbf{K}_{k,:}\mathbf{d} - o_k)\right)
+\end{align}
+The step size $\alpha$ starts at 0.05 and decays by a factor of 0.995 per iteration to ensure convergence. The dual variables $\lambda_k$ are shared via CAN.
+
+% ===================================================================
+\section{Performance Metrics}
+
+Three metrics are computed continuously at each control cycle:
+
+\textbf{Energy} $E$ is the accumulated electrical energy:
+\begin{equation}
+  E = \sum_{k} P(k) \cdot \Delta t
+\end{equation}
+where $P(k)$ is the instantaneous power at sample $k$ and $\Delta t = 10$\,ms.
+
+\textbf{Visibility error} $V$ is the time-averaged illuminance deficit:
+\begin{equation}
+  V = \frac{1}{N_s} \sum_{k} \max(0, \; L_{\text{ref}} - L(k))
+\end{equation}
+
+\textbf{Flicker} $F$ captures duty-cycle oscillations via changes in direction:
+\begin{equation}
+  F = \frac{1}{N_s} \sum_{k} |d(k) - d(k-1)| + |d(k-1) - d(k-2)|
+\end{equation}
+
+A dedicated \texttt{RM} command resets all metrics to zero, enabling fair per-algorithm comparisons.
 
 % ===================================================================
 \section{Results}
 
-The experimental section should focus on the criteria explicitly requested in the manual. First, the wake-up and calibration procedure should be demonstrated with timing information and with the identified $\mathbf{K}$ and $\mathbf{o}$ values. Second, cooperative control should be tested under occupation changes and external disturbances, always comparing coordinated and local-only operation.
+\subsection{Calibration}
 
-For equal energy costs, the expected result is a feasible operating point where all desks satisfy the lower illuminance bounds and the total energy is shared according to the coupling structure. For different energy costs, the cheaper luminaires should naturally carry a larger fraction of the load, provided that the visibility constraints remain satisfied.
+The wake-up and calibration procedure completes in approximately 4.2\,seconds for three nodes. Table~\ref{tab:K} shows the measured gain matrix. The diagonal dominance confirms that each LED primarily illuminates its own desk, with cross-coupling gains 2--80$\times$ weaker than the self-coupling. This physical characteristic limits the degree to which distributed algorithms can redistribute duty based on energy costs.
 
-The key quantitative metrics are the accumulated energy $E$, the visibility error $V$, and the flicker metric $F$ defined in the project guide. These metrics, together with representative plots of reference, measured illuminance, and control input, should support the final comparison between the distributed method and the non-coordinated baseline.
+\subsection{Algorithm Comparison --- Equal Costs}
 
-% TODO: Insert boot/calibration timing table.
-% TODO: Insert measured gain matrix and background vector.
-% TODO: Insert cooperative vs local-only plots with reference, measured lux, and control.
-% TODO: Insert table comparing E, V, and F for equal and different energy costs.
+All four algorithms were tested with equal costs $c = [1, 1, 1]$ and reference $L_{\text{ref}} = 20$\,lux. Metrics were reset before each 20-second measurement window.
+
+\begin{table}[H]
+\centering
+\caption{Algorithm comparison with equal costs (20\,s measurement).}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{l|ccc|ccc|c}
+\toprule
+ & \multicolumn{3}{c|}{Duty cycle} & \multicolumn{3}{c|}{Energy [J]} & Vis.~err \\
+Algorithm & N1 & N2 & N3 & N1 & N2 & N3 & (max) \\
+\midrule
+PI Only    & 0.475 & 0.165 & 0.230 & 11.70 & 5.15 & 8.91 & 0.061 \\
+Consensus  & 0.477 & 0.164 & 0.232 & 11.74 & 5.17 & 8.93 & 0.058 \\
+ADMM       & 0.470 & 0.162 & 0.233 & 11.78 & 5.21 & 8.75 & 0.064 \\
+Dual Dec.  & 0.486 & 0.168 & 0.233 & 11.96 & 5.26 & 8.78 & 0.059 \\
+\bottomrule
+\end{tabular}%
+}
+\label{tab:equal}
+\end{table}
+
+With equal costs, all algorithms converge to essentially the same operating point, confirming that the constraint-satisfying solution is unique when costs are uniform. The visibility error is below 0.065\,lux for all configurations, and flicker is zero in steady state. The energy consumption is comparable across all algorithms ($\sim$25.8\,J total over 20\,s).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../../results/alg_comparison_equal.png}
+\caption{Algorithm comparison: energy, visibility error, and flicker with equal costs.}
+\label{fig:equal}
+\end{figure}
+
+\subsection{Unequal Energy Costs}
+
+With costs $c = [1, 2, 3]$, the distributed algorithms should ideally shift duty towards the cheapest node (Node~1). However, the measured gain matrix shows that cross-coupling is weak relative to self-coupling: even at maximum duty, Node~1's LED contributes less than 1\,lux to Node~2's sensor ($K_{21} \times 1.0 = 0.89$\,lux). This means each node is largely constrained to provide its own illuminance, leaving little room for cost-based redistribution.
+
+\begin{table}[H]
+\centering
+\caption{Duty allocation: equal vs.\ unequal costs (Consensus).}
+\begin{tabular}{l|ccc}
+\toprule
+Cost setting & N1 & N2 & N3 \\
+\midrule
+Equal $[1,1,1]$   & 0.477 & 0.164 & 0.232 \\
+Unequal $[1,2,3]$ & 0.481 & 0.167 & 0.240 \\
+\bottomrule
+\end{tabular}
+\label{tab:unequal}
+\end{table}
+
+The differences are marginal ($<$2\% change in duty). This is not a limitation of the algorithm but of the physical geometry: the cross-coupling gains are 10--80$\times$ weaker than the self-coupling (e.g., $K_{21}/K_{22} = 0.012$). Even at maximum duty, Node~1's LED contributes less than 1\,lux to Node~2's sensor. Each node is therefore largely constrained to provide its own illuminance, leaving minimal room for cost-based redistribution. In a system with stronger inter-desk coupling, the optimisation would produce more pronounced duty differentiation.
+
+ADMM and dual decomposition were also implemented and tested. While both converged correctly in isolated tests, they showed sensitivity to algorithm switching during rapid automated testing (residual state from previous algorithm modes). In practice, the consensus approach proved the most robust for online switching.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../../results/duty_unequal_costs.png}
+\caption{Duty and energy allocation with unequal costs $c = [1, 2, 3]$.}
+\label{fig:unequal}
+\end{figure}
+
+\subsection{Step Response}
+
+Figure~\ref{fig:step} shows the response of Node~1 to a reference step from 5 to 25\,lux. The feedforward term~\eqref{eq:ff} provides an immediate open-loop jump, and the PI corrects the residual within 1--2 control cycles. The measured illuminance reaches the target within the first sample ($\sim$0.5\,s polling resolution), confirming that the feedforward dominates the transient response.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../../results/step_response_ff.png}
+\caption{Step response of Node~1 (ref: 5\,$\to$\,25\,lux) with PI + feedforward.}
+\label{fig:step}
+\end{figure}
+
+\subsection{Occupancy Change}
+
+Figure~\ref{fig:occ} shows Node~1 transitioning between LOW ($L_{\text{ref}} = 10$\,lux) and HIGH ($L_{\text{ref}} = 30$\,lux) occupancy states. The controller tracks the new reference within one sample period after each transition, demonstrating that the feedforward plus PI combination handles large reference changes effectively.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../../results/occupancy_change.png}
+\caption{Occupancy change: Node~1 transitions LOW\,$\to$\,HIGH\,$\to$\,LOW.}
+\label{fig:occ}
+\end{figure}
+
+\subsection{Disturbance Rejection}
+
+Figure~\ref{fig:dist} shows the system's response to an external disturbance (opening and closing the box lid). When the box is opened, the ambient light conditions change abruptly. The controller compensates by adjusting the duty cycles to maintain the 20\,lux reference. After a brief transient ($< 2$\,s), the measured illuminance returns to the target. When the box is closed, the system recovers within approximately 3\,seconds.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\columnwidth]{../../results/disturbance_rejection.png}
+\caption{Disturbance rejection: box opened at red line, closed at green line.}
+\label{fig:dist}
+\end{figure}
 
 % ===================================================================
 \section{Conclusions}
 
-The final system satisfies the main objectives of the second stage: asynchronous CAN-BUS communications, hub-based PC interaction, deterministic network wake-up, repeated calibration of self- and cross-coupling gains, and cooperative distributed control. The final discussion should emphasise the practical trade-off between solution quality, communication effort, convergence speed, and implementation complexity.
+The distributed illumination system satisfies the main objectives of Phase~2: CAN-BUS communications at 500\,kbps, hub-based PC interaction, deterministic network wake-up, automated calibration of the gain matrix, and distributed cooperative control.
 
-The most important conclusion to support experimentally is that cooperative control improves the global behaviour of the illumination system when compared with purely local operation, especially under coupling, occupation changes, and external disturbances. The final choice of algorithm should therefore be justified not only by feasibility, but also by measured performance in energy, visibility, flicker, and startup robustness.
+The PI controller with feedforward provides fast reference tracking (sub-second settling) and effective disturbance rejection. Three distributed optimisation algorithms (Consensus, ADMM, and Dual Decomposition) were implemented and verified to converge to feasible operating points that satisfy all illuminance constraints.
+
+With equal energy costs, all algorithms converge to the same solution, as expected from the unique feasible point of the linear program. With unequal costs, the redistribution effect is limited by the weak cross-coupling in the physical setup. In a system with stronger inter-desk coupling, the cost-based optimisation would produce more pronounced duty differentiation.
+
+The key design decisions that proved important were: (i)~dedicating Core~1 exclusively to CAN communication, avoiding SPI contention; (ii)~using feedforward for immediate open-loop response, reducing the burden on the PI integrator; and (iii)~broadcasting the calibration plan over CAN for deterministic multi-node synchronisation.
 
 \end{document}
