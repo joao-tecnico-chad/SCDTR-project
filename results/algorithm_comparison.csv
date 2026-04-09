@@ -1,0 +1,7 @@
+algorithm,node_id,lux,duty,energy,visibility,flicker
+PI Only,1,19.967,2137,37.865,2.653,0.0
+PI Only,2,0.0,0,0,0,0
+PI Only,3,0.0,0,0,0,0
+Consensus,1,19.919,2156,54.576,2.165,0.0
+Consensus,2,0.0,0,0,0,0
+Consensus,3,0.0,0,0,0,0
