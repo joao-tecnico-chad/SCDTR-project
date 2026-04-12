@@ -33,13 +33,6 @@ inline void runControlStep() {
   float visErr = (refLux > filteredLux) ? (refLux - filteredLux) : 0.0f;
   visibilityErrorIntegral += visErr;
 
-  // Flicker: f_k = |d_k - d_{k-1}| + |d_{k-1} - d_{k-2}| if direction change
-  float currentDuty = (float)localPwm / 4095.0f;
-  float diff1 = currentDuty - piPrevDuty;
-  float diff2 = piPrevDuty - piPrevPrevDuty;
-  if (diff1 * diff2 < 0.0f) {
-    flickerIntegral += fabsf(diff1) + fabsf(diff2);
-  }
   metricSampleCount++;
 
   pushHistory(filteredLux, localPwm);
@@ -104,9 +97,19 @@ inline void runControlStep() {
     setLedPwm((uint16_t)(duty * 4095.0f));
   }
 
-  // Track duty history for flicker (always, regardless of control mode)
-  piPrevPrevDuty = piPrevDuty;
-  piPrevDuty = (float)localPwm / 4095.0f;
+  // Flicker: measured AFTER the PI updates localPwm so we compare the
+  // new duty (just applied) against the previous two samples.
+  // f_k = |d_k - d_{k-1}| + |d_{k-1} - d_{k-2}| if direction reversal
+  {
+    float currentDuty = (float)localPwm / 4095.0f;
+    float diff1 = currentDuty - piPrevDuty;
+    float diff2 = piPrevDuty - piPrevPrevDuty;
+    if (diff1 * diff2 < 0.0f) {
+      flickerIntegral += fabsf(diff1) + fabsf(diff2);
+    }
+    piPrevPrevDuty = piPrevDuty;
+    piPrevDuty = currentDuty;
+  }
 
   controlLastExecUs = micros() - startUs;
   if (controlLastExecUs > controlMaxExecUs) {
