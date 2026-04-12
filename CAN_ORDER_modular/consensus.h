@@ -87,9 +87,9 @@ inline void solveLocalConsensus() {
   }
   if (d_min < 0.0f) d_min = 0.0f;
 
-  // Cost-optimal unconstrained solution: shift our duty down by cost/rho.
-  // This minimises the local cost c[i]*d[i] plus the consensus penalty
-  // rho/2 * (d[i] - d_avg[i])^2, ignoring illuminance constraints.
+  // Cost-optimal unconstrained solution: d_unc = d_avg - c/rho (CONS_RHO=2.0).
+  // With c=1 and rho=2.0, this shifts duty down by 0.5 at most.
+  // Higher rho -> smaller cost effect, faster consensus convergence.
   float d_unc = cons.d_avg[i] - cons.c[i] / CONS_RHO;
 
   // Take the higher of cost-optimal and constraint-required duty.

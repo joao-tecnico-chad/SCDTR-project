@@ -87,7 +87,7 @@ inline void runControlStep() {
     // keeps growing ("winds up"), causing large overshoot when the error
     // reverses.  Back-calculation fixes this by feeding the difference
     // between the raw and clamped output back into the integrator,
-    // effectively "unwinding" the excess integral at rate 1/TT.
+    // effectively "unwinding" the excess integral at rate 1/TT (PI_TT=0.15s).
     if (antiWindupEnabled) {
       float rawOutput = ff_duty + P + piIntegral;
       float clampedOutput = constrain(rawOutput, 0.0f, 1.0f);

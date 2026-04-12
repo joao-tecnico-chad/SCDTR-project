@@ -36,8 +36,9 @@ inline void initADMM() {
 // d-update: closed-form primal update.
 // Minimise the local cost  c[i]*d[i] + (rho/2)*||d[i] - z[i] + u[i]||^2
 // Taking the derivative and setting to zero gives:
-//   d[i] = z[i] - u[i] - c[i]/rho
-// Then clamp to [0,1] to keep the duty physically valid.
+//   d[i] = z[i] - u[i] - c[i]/rho    (ADMM_RHO = 1.0)
+// Since ADMM_RHO=1.0, the cost term shifts duty directly (unlike
+// Consensus where CONS_RHO=2.0 halves the effect). Clamp to [0,1].
 inline void admmUpdateD() {
   int i = cons.myIndex;
   admm.d[i] = admm.z[i] - admm.u[i] - cons.c[i] / ADMM_RHO;
@@ -45,11 +46,10 @@ inline void admmUpdateD() {
 }
 
 // z-update: project onto the feasible set defined by K*z + o >= L_ref.
-// Start from the unconstrained optimum z = d + u, then iteratively clip
+// Start from the unconstrained optimum z = d + u, then iteratively fix
 // any violated illuminance constraint by pushing z along the constraint
-// gradient (the corresponding row of K).  This is Dykstra-style
-// alternating projection, repeated up to 20 times or until all
-// constraints are satisfied.
+// gradient (the corresponding row of K).  This is iterative feasibility
+// projection, repeated up to 20 times or until all constraints are met.
 inline void admmUpdateZ() {
   float z_target[CONS_MAX_NODES];
   for (int i = 0; i < cons.numNodes; i++)
