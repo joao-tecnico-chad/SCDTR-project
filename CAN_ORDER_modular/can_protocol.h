@@ -15,6 +15,9 @@
 #include "protocol_defs.h"
 
 // ----- Command frame handler -----
+// Processes CMD frames (base 0x300). These set LED duty, reference, occupancy,
+// cost, bounds, anti-windup, feedback, and streaming on the target node.
+// Payload: [command_type, sender_id, value_hi, value_lo]
 
 inline void handleCommandFrame(uint32_t packetId, uint8_t packetSize, const uint8_t *data) {
   if (packetSize < 2) {
@@ -146,6 +149,9 @@ inline void handleCommandFrame(uint32_t packetId, uint8_t packetSize, const uint
 }
 
 // ----- Calibration plan frame handler -----
+// Calibration plan is split into two frames (PLAN_A + PLAN_B) because 8 bytes
+// isn't enough for all parameters. When both halves are received with matching
+// session IDs, the calibration session starts with synchronized timing.
 
 inline void processCalibrationPlanFrame(uint8_t packetSize, const uint8_t *data) {
   if (packetSize < 8) {
@@ -279,6 +285,18 @@ inline void handleStreamFrame(uint8_t packetSize, const uint8_t *data) {
 }
 
 // ----- Top-level CAN frame dispatcher -----
+// Routes every received CAN frame to the appropriate handler based on
+// the CAN ID range. The ID space is partitioned:
+//   0x100-0x17F: Hello (heartbeat/discovery)
+//   0x300-0x37F: Command (set duty, ref, occupancy, etc.)
+//   0x400-0x47F: Calibration plan
+//   0x500-0x57F: Query (request value from peer)
+//   0x580-0x5FF: Reply (response to query)
+//   0x600-0x67F: Stream (real-time telemetry)
+//   0x680-0x6FF: Gain Exchange (K matrix rows after calibration)
+//   0x700-0x77F: Consensus (duty proposals)
+//   0x780-0x7BF: ADMM (primal/dual variables)
+//   0x7C0-0x7FF: Dual Decomposition (duty/lambda)
 
 inline void handleReceivedCanFrame(const CanFrame &frame) {
   if (startupState != STARTUP_READY) {

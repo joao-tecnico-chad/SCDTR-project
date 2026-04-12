@@ -33,6 +33,11 @@ inline void canIrqHandler() {
 }
 
 // ----- FIFO packing/unpacking -----
+// CAN frames are sent between cores as 3 x uint32_t words through the RP2040 FIFO:
+//   Word 0: [kind:8][canId:16][length:8]  (header)
+//   Word 1: data[0..3] packed little-endian  (payload low)
+//   Word 2: data[4..7] packed little-endian  (payload high)
+// Diagnostics use only 1 word: [FIFO_DIAG:8][stage:8][code:8][detail:8]
 
 inline uint32_t packFrameHeader(FifoMessageKind kind, uint16_t canId, uint8_t length) {
   // Layout: [kind:8][canId:16][len:8]
@@ -244,7 +249,12 @@ inline void serviceCore1ToCore0Fifo() {
 }
 
 // ----- High-level CAN message builders -----
+// Each builder constructs a payload byte array and calls enqueueTxFrame().
+// The CAN ID = BASE + nodeId (or targetNode for unicast messages).
 
+// Hello frame: broadcast this node's current state to all peers.
+// Payload (7 bytes): [nodeId, pwm_hi, pwm_lo, lux_hi, lux_lo, ref_hi, ref_lo]
+// Lux and ref are fixed-point: value * 100, stored as uint16.
 inline void sendHelloFrame() {
   uint16_t luxEnc = (uint16_t)constrain((int)(filteredLux * 100.0f), 0, 65535);
   uint16_t refEnc = (uint16_t)constrain((int)(refLux * 100.0f), 0, 65535);
@@ -260,6 +270,8 @@ inline void sendHelloFrame() {
   enqueueTxFrame(CAN_ID_HELLO_BASE + nodeId, payload, sizeof(payload));
 }
 
+// Command frame: send a set/control command to a specific node (or broadcast).
+// Payload (4 bytes): [command_type, sender_id, value_hi, value_lo]
 inline void sendSimpleCommand(uint8_t targetNode, CommandType command, uint16_t value) {
   uint8_t payload[4] = {
     (uint8_t)command,
@@ -270,6 +282,9 @@ inline void sendSimpleCommand(uint8_t targetNode, CommandType command, uint16_t 
   enqueueTxFrame(CAN_ID_COMMAND_BASE + targetNode, payload, sizeof(payload));
 }
 
+// Query frame: ask a remote node for a specific value (lux, duty, energy, etc.).
+// Payload (2 bytes): [query_code, requester_id]
+// The reply comes back as a Reply frame with the float value.
 inline void sendQuery(uint8_t targetNode, QueryCode queryCode) {
   uint8_t payload[2] = {(uint8_t)queryCode, nodeId};
   if (enqueueTxFrame(CAN_ID_QUERY_BASE + targetNode, payload, sizeof(payload))) {
@@ -280,6 +295,9 @@ inline void sendQuery(uint8_t targetNode, QueryCode queryCode) {
   }
 }
 
+// Reply frame: respond to a query with a float value.
+// Payload (6 bytes): [query_code, sender_id, float_b0, float_b1, float_b2, float_b3]
+// Float is sent as raw IEEE 754 bytes (little-endian).
 inline void sendReply(uint8_t requesterNode, QueryCode queryCode, float value) {
   union {
     float f;
@@ -302,6 +320,8 @@ inline void sendCharCommand(uint8_t targetNode, CommandType command, char value)
   sendSimpleCommand(targetNode, command, (uint16_t)(uint8_t)value);
 }
 
+// Stream frame: broadcast real-time telemetry (lux or duty) with timestamp.
+// Payload (8 bytes): [variable, nodeId, float_b0..b3, time_hi, time_lo]
 inline void sendStreamFrame(char variable) {
   float value = (variable == 'y') ? filteredLux : (float)localPwm;
   union {
