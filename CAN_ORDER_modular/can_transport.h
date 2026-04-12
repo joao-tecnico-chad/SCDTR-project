@@ -9,7 +9,7 @@
 // that plumbing plus the typed CAN frame builders (hello, command, query,
 // reply, stream, calibration plan).
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

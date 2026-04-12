@@ -8,7 +8,7 @@
 // anti-windup, feedback, streaming, calibration, algorithm selection, and
 // diagnostics. Parsing is nonblocking: characters accumulate until newline.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

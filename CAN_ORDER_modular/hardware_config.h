@@ -6,7 +6,7 @@
 // only require editing one file. It also defines timing intervals used by
 // the control loop, CAN heartbeat, calibration protocol, and diagnostics.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

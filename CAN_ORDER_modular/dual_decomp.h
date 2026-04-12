@@ -9,7 +9,7 @@
 // reuses the gain matrix K, offsets o, references L_ref, and costs c
 // from the shared ConsensusState (`cons`).
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

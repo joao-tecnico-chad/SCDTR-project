@@ -12,7 +12,7 @@
 // Decomposition reuse the same K matrix, baseline vector, and references
 // stored in ConsensusState (the `cons` global).
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

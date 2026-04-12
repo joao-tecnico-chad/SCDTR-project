@@ -6,7 +6,7 @@
 // module includes it to access shared types and extern-declared runtime
 // variables. The actual variable definitions live in CAN_ORDER_modular.ino.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

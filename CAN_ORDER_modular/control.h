@@ -7,7 +7,7 @@
 // quality-of-service metrics, runs the PI + feedforward controller when
 // feedback is enabled, and records history samples for later retrieval.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

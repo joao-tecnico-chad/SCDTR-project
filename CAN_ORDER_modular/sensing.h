@@ -6,7 +6,7 @@
 // low-pass filtering, LED PWM output, rolling history buffers, and the
 // peer table that tracks other CAN nodes discovered via hello frames.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

@@ -8,7 +8,7 @@
 // ADMM, or dual decomposition. Each handler validates length and fields
 // before acting on the payload.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

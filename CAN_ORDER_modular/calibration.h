@@ -11,7 +11,7 @@
 // and repeated several times for reliability. The wake-up state machine
 // handles discovery and auto-calibration on coordinator nodes.
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 // ============================================================================
 #pragma once
 

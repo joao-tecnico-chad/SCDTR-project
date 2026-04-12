@@ -24,7 +24,7 @@
 //   control.h          - PI controller, hello, streaming, diagnostics
 //   serial_ui.h        - Serial command parser, startup, state reset
 //
-// Authors: Joao Rocha, SCDTR course project
+// Authors: Joao Rocha, Ricardo Gaspar, Diogo Costa — SCDTR 2025/2026
 //
 // Serial Command Quick Reference (type "help" at runtime for full list):
 //   u <n> <pwm>     Set LED PWM            r <n> <lux>   Set lux reference
@@ -152,6 +152,7 @@ void setup() {
   Serial.begin(115200);
   analogReadResolution(12);
   analogWriteResolution(12);
+  analogWriteFreq(45000);  // 45 kHz PWM -- must be >10x the LDR RC filter cutoff (~160 Hz)
   pinMode(LED_PIN, OUTPUT);
   pinMode(LDR_PIN, INPUT);
   setLedPwm(0);
