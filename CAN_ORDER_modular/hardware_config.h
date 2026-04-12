@@ -55,7 +55,7 @@ const uint16_t CAN_ID_STREAM_BASE = 0x600;    // Real-time streaming of lux or d
 // ----- Network limits -----
 const uint8_t BROADCAST_NODE = 0x7F;      // Special target address meaning "all nodes" (CAN_ID_xxx_BASE + 0x7F)
 const int MAX_NODES = 8;                  // Maximum number of luminaires in the network
-const int HISTORY_LEN = 600;              // Circular buffer length for lux/duty history (600 samples at 100 Hz = 6 s)
+const int HISTORY_LEN = 6000;             // Circular buffer: 6000 samples at 100 Hz = 60 s (last minute)
 const int SERIAL_BUFFER_LEN = 96;         // Maximum serial command line length in bytes
 const int TX_QUEUE_LEN = 24;              // Outbound CAN frame ring buffer depth (Core 0 side)
 const int CORE1_EVENT_QUEUE_LEN = 24;     // Inbound CAN frame ring buffer depth (Core 1 -> Core 0)

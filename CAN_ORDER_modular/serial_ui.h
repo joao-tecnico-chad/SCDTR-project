@@ -295,6 +295,8 @@ inline void handleLineCommand(const char *line) {
     Serial.println("  g U <node>         Get LOW bound");
     Serial.println("  g L <node>         Get current lower bound");
     Serial.println("  g C <node>         Get cost coefficient");
+    Serial.println("--- Buffer ---");
+    Serial.println("  g b <y/u> <node>   Get last-minute buffer (lux or duty)");
     Serial.println("--- Streaming ---");
     Serial.println("  s <y/u> <node>     Start streaming lux or duty");
     Serial.println("  S <y/u> <node>     Stop streaming");
