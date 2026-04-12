@@ -59,7 +59,7 @@ This report presents the distributed cooperative illumination system developed i
 % ===================================================================
 \section{System Architecture}
 
-Each node comprises an RP2040 Pico, an LED (12-bit PWM), an LDR luxmeter (10\,k$\Omega$ divider), and an MCP2515 CAN controller (SPI, 16\,MHz crystal, 5\,V supply). LEDs are mounted in 3D-printed fixtures that minimise external light seepage.
+Each node comprises an RP2040 Pico, an LED driven by 12-bit PWM (0--4095), an LDR-based luxmeter with a voltage-divider circuit (10\,k$\Omega$ fixed resistor), and an MCP2515 CAN controller interfaced via SPI at 10\,MHz. The MCP2515 modules use 16\,MHz crystals and are powered at 5\,V from the Pico VBUS pin; a common ground between all modules is essential. LEDs and sensors are mounted in 3D-printed fixtures that minimise external light seepage into the measurement area.
 
 \begin{figure}[H]
 \centering
@@ -107,7 +107,7 @@ The RP2040 dual-core architecture separates concerns (Figure~\ref{fig:arch}): Co
 \label{fig:arch}
 \end{figure}
 
-Any USB-connected node acts as a hub, translating serial commands to CAN and routing replies back.
+This separation bounds CAN interrupt latency independently of control-loop computation time. Any USB-connected node acts as a hub, translating serial commands to CAN and routing replies back, allowing the complete network to be operated from a single terminal.
 
 % ===================================================================
 \section{CAN-BUS Communication}
@@ -141,7 +141,7 @@ Base ID & Type & Direction & Payload \\
 % ===================================================================
 \section{Calibration}
 
-At boot, nodes broadcast SYN/ACK frames for 5\,s to discover peers (Figure~\ref{fig:wakeup}). The coordinator then triggers calibration.
+At power-on, all nodes enter a discovery phase where they broadcast SYN frames and reply with ACK. A node exits wakeup only after the 5-second window expires, guaranteeing full reachability (Figure~\ref{fig:wakeup}). The coordinator (lowest node ID) then broadcasts the calibration plan.
 
 \begin{figure}[H]
 \centering
@@ -232,13 +232,13 @@ Each node runs a discrete PI controller with feedforward at 100\,Hz (10\,ms peri
 % ===================================================================
 \section{Distributed Algorithms}
 
-The optimisation minimises $\sum c_i d_i$ subject to $\mathbf{K}\mathbf{d} + \mathbf{o} \geq \mathbf{L}_{\text{ref}}$ and $0 \leq d_i \leq 1$. Three algorithms were implemented:
+The optimisation problem minimises total weighted energy $\sum c_i d_i$ subject to illuminance constraints $\mathbf{K}\mathbf{d} + \mathbf{o} \geq \mathbf{L}_{\text{ref}}$ and duty bounds $0 \leq d_i \leq 1$, where $c_i$ is the cost coefficient for luminaire~$i$. Three distributed algorithms were implemented and compared against the local PI baseline:
 
-\textbf{Consensus ADMM.} Each node solves $\min c_i d_i + (\rho/2)(d_i - \bar{d}_i)^2$ subject to all illuminance constraints, exchanges proposals via CAN, and averages ($\rho{=}2.0$, $k_{\max}{=}50$).
+\textbf{Consensus ADMM.} Each node $i$ solves $\min c_i d_i + (\rho/2)(d_i - \bar{d}_i)^2$ subject to all $N$ illuminance constraints, checking that its proposed duty satisfies not only its own constraint but also the constraints of all peers. Proposals are exchanged via CAN and averaged until convergence ($\rho{=}2.0$, $k_{\max}{=}50$).
 
-\textbf{ADMM.} Decomposes into primal $d_i = z_i - u_i - c_i/\rho$, feasibility projection $\mathbf{z} = \Pi_{\mathcal{C}}(\mathbf{d}+\mathbf{u})$, and dual update $u_i \mathrel{+}= d_i - z_i$ ($\rho{=}1.0$).
+\textbf{ADMM.} The Alternating Direction Method of Multipliers decomposes into a primal update $d_i = z_i - u_i - c_i/\rho$, a feasibility projection $\mathbf{z} = \Pi_{\mathcal{C}}(\mathbf{d}+\mathbf{u})$ via iterative Dykstra projections, and a dual update $u_i \mathrel{+}= d_i - z_i$ ($\rho{=}1.0$).
 
-\textbf{Dual Decomposition.} Subgradient ascent on Lagrange multipliers with step decay ($\alpha_0{=}0.05$, decay 0.995).
+\textbf{Dual Decomposition.} Lagrangian relaxation with subgradient ascent on the dual variables. The step size $\alpha_0{=}0.05$ decays geometrically (factor 0.995) to ensure convergence.
 
 % ===================================================================
 \section{Results}
@@ -275,7 +275,7 @@ Dual Dec.  & 0.516 & 0.170 & 0.269 & 13.14 & 5.32 & 10.23 & 0.024 \\
 
 \subsection{Unequal Costs}
 
-With $c{=}[1,2,3]$, duty redistribution is marginal ($<$2\%, Table~\ref{tab:unequal}) because cross-coupling is 7--70$\times$ weaker than self-gains---a physical limitation, not an algorithm deficiency.
+With $c{=}[1,2,3]$, the consensus algorithm should shift duty towards the cheapest node. However, cross-coupling gains are 7--70$\times$ weaker than self-gains (e.g., $K_{21}/K_{22} = 0.042$), so each node must provide most of its own illuminance. The resulting duty change is marginal ($<$2\%, Table~\ref{tab:unequal})---a physical limitation of the box geometry, not an algorithm deficiency.
 
 \begin{table}[H]
 \centering
@@ -300,7 +300,7 @@ Unequal $[1,2,3]$ & 0.481 & 0.167 & 0.240 \\
 
 \subsection{Step Response and Occupancy}
 
-Feedforward enables sub-sample reference tracking: a 5$\to$25\,lux step is reached within one 10\,ms control cycle (Figure~\ref{fig:step}). Occupancy changes (LOW$\to$HIGH$\to$LOW, Figure~\ref{fig:occ}) are tracked equally fast.
+Figure~\ref{fig:step} shows Node~1's response to a 5$\to$25\,lux reference step. The feedforward term provides an immediate duty jump; the measured illuminance reaches the target within the first control cycle (${\sim}10$\,ms). Figure~\ref{fig:occ} shows occupancy-driven transitions (LOW$\to$HIGH$\to$LOW), tracked with the same single-cycle speed.
 
 \begin{figure}[H]
 \centering
@@ -318,7 +318,7 @@ Feedforward enables sub-sample reference tracking: a 5$\to$25\,lux step is reach
 
 \subsection{Disturbance Rejection}
 
-A physical test (opening/closing the box, Figure~\ref{fig:dist}) confirms all nodes maintain 20\,lux within 1\,lux during the disturbance. A programmatic test (forcing Node~2 to duty\,=\,0.8, Figure~\ref{fig:dist_prog}) shows Node~1 compensates via cross-coupling (duty drops 70\%) and recovers in sub-second time.
+Two disturbance tests were performed. In the physical test (Figure~\ref{fig:dist}), opening and closing the box lid causes light to escape; all three nodes maintain 20\,lux within 1\,lux throughout. In the programmatic test (Figure~\ref{fig:dist_prog}), Node~2's duty was forced to 0.8 open-loop. Node~2's cross-illumination raises Node~1's lux, so Node~1's PI controller reduces duty from 0.52 to 0.15 (70\% reduction) to maintain the target. When feedback is restored, recovery occurs within one polling sample ($<$1.3\,s resolution); the actual PI recovery is sub-second.
 
 \begin{figure}[H]
 \centering
