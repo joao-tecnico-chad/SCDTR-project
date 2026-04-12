@@ -245,14 +245,16 @@ inline void handleReplyFrame(uint8_t packetSize, const uint8_t *data) {
   Serial.print(sourceNode);
   Serial.print(" ");
   if (code == 'o') {
-    Serial.println((char)((int)payload.f));
+    Serial.print((char)((int)payload.f));
   } else if (code == 'a' || code == 'f') {
-    Serial.println((int)payload.f);
+    Serial.print((int)payload.f);
   } else if (code == 'u') {
-    Serial.println(payload.f, 0);
+    Serial.print(payload.f, 0);
   } else {
-    Serial.println(payload.f, 3);
+    Serial.print(payload.f, 3);
   }
+  printQueryLabel(code);
+  Serial.println();
 }
 
 // ----- Stream frame handler -----

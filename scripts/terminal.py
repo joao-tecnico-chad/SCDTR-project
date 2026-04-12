@@ -63,8 +63,12 @@ def main():
     port = ports[idx]
     print(f"\nConnecting to {port} at 115200 baud...")
     ser = serial.Serial(port, 115200, timeout=0.1)
-    time.sleep(0.5)
-    ser.read(4096)  # flush
+    time.sleep(0.3)
+
+    # Show any pending boot messages instead of discarding them
+    pending = ser.read(4096)
+    if pending:
+        print(pending.decode('utf-8', errors='replace'), end='')
 
     print(f"Connected! Type commands and press Enter.")
     print(f"Type 'help' to see all commands.")

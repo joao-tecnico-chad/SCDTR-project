@@ -74,6 +74,33 @@ inline bool tick10Reached(uint16_t targetTick) {
   return (int16_t)(nowTick10() - targetTick) >= 0;
 }
 
+// ----- Human-readable labels for query responses -----
+// Appends a description like "  // illuminance [lux]" after the value.
+
+inline void printQueryLabel(char code) {
+  Serial.print("  // ");
+  switch (code) {
+    case 'y': Serial.print("illuminance [lux]"); break;
+    case 'u': Serial.print("duty cycle [PWM 0-4095]"); break;
+    case 'r': Serial.print("reference [lux]"); break;
+    case 'v': Serial.print("LDR voltage [V]"); break;
+    case 'o': Serial.print("occupancy state"); break;
+    case 'a': Serial.print("anti-windup [0=off, 1=on]"); break;
+    case 'f': Serial.print("feedback [0=off, 1=on]"); break;
+    case 'd': Serial.print("background illuminance [lux]"); break;
+    case 'p': Serial.print("instantaneous power [W]"); break;
+    case 't': Serial.print("uptime [s]"); break;
+    case 'E': Serial.print("accumulated energy [J]"); break;
+    case 'V': Serial.print("visibility error [lux]"); break;
+    case 'F': Serial.print("flicker [s^-1]"); break;
+    case 'O': Serial.print("HIGH occupancy bound [lux]"); break;
+    case 'U': Serial.print("LOW occupancy bound [lux]"); break;
+    case 'L': Serial.print("current lower bound [lux]"); break;
+    case 'C': Serial.print("energy cost coefficient"); break;
+    default:  Serial.print("unknown"); break;
+  }
+}
+
 // ----- Utility printers -----
 
 inline void printAck() {

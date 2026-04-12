@@ -52,6 +52,19 @@ const uint16_t CAN_ID_QUERY_BASE = 0x500;     // Remote query request (ask a nod
 const uint16_t CAN_ID_REPLY_BASE = 0x580;     // Remote query reply (node responds with a float)
 const uint16_t CAN_ID_STREAM_BASE = 0x600;    // Real-time streaming of lux or duty values
 
+// ----- Auto-config: UID-to-node lookup table -----
+// Each Pico's flash has a unique 8-byte ID. We use the last 2 bytes as a key
+// to auto-assign node IDs at boot, skipping the manual prompt.
+// To add a new Pico: flash uid_reader sketch, note the last 2 bytes, add here.
+struct UidEntry { uint16_t key; uint8_t nodeId; };
+const UidEntry UID_TABLE[] = {
+  { 0xB627, 1 },  // Pico on port 1101 (UID: E66118604B4EB627)
+  { 0x4321, 2 },  // Pico on port 1201 (UID: E66118604B594321)
+  { 0x6D27, 3 },  // Pico on port 1301 (UID: E66118604B5A6D27)
+};
+const int UID_TABLE_SIZE = sizeof(UID_TABLE) / sizeof(UID_TABLE[0]);
+const int AUTO_TOTAL_NODES = 3;  // Total nodes when auto-configured
+
 // ----- Network limits -----
 const uint8_t BROADCAST_NODE = 0x7F;      // Special target address meaning "all nodes" (CAN_ID_xxx_BASE + 0x7F)
 const int MAX_NODES = 8;                  // Maximum number of luminaires in the network

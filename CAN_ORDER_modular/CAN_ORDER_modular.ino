@@ -39,6 +39,8 @@
 //   help / h / ?    Show help
 // ============================================================================
 
+#include <pico/unique_id.h>
+
 #include <Arduino.h>
 #include <SPI.h>
 #include <mcp_can.h>
@@ -159,7 +161,36 @@ void setup() {
   filteredLux = readLuxFiltered();
   updateCurrentLowerBound();
 
-  Serial.println("Introduz o ID do no (1-8):");
+  // Auto-configure node ID from flash UID lookup table
+  pico_unique_board_id_t boardId;
+  pico_get_unique_board_id(&boardId);
+  uint16_t uidKey = ((uint16_t)boardId.id[6] << 8) | boardId.id[7];
+
+  bool autoConfigured = false;
+  for (int i = 0; i < UID_TABLE_SIZE; i++) {
+    if (UID_TABLE[i].key == uidKey) {
+      nodeId = UID_TABLE[i].nodeId;
+      totalNodes = AUTO_TOTAL_NODES;
+      B_PARAM = B_PARAM_PER_NODE[nodeId];
+      isCoordinator = (nodeId == 1);
+      startupState = STARTUP_READY;
+      updateCurrentLowerBound();
+      autoConfigured = true;
+      Serial.print("Auto-configured as Node ");
+      Serial.print(nodeId);
+      Serial.print(" (UID key: 0x");
+      Serial.print(uidKey, HEX);
+      Serial.println(")");
+      break;
+    }
+  }
+
+  if (!autoConfigured) {
+    Serial.print("Unknown UID key: 0x");
+    Serial.println(uidKey, HEX);
+    Serial.println("Enter node ID (1-8):");
+  }
+
   add_repeating_timer_ms(-(int32_t)CONTROL_PERIOD_MS, controlTimerCallback, nullptr, &controlTimer);
 }
 

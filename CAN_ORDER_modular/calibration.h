@@ -273,12 +273,19 @@ inline void serviceWakeupStateMachine() {
         sendSimpleCommand(BROADCAST_NODE, CMD_ANNOUNCE);
       }
       if (now - bootMs >= WAKEUP_WINDOW_MS) {
+        Serial.println("Wakeup complete. Peers discovered.");
         wakeupState = WAKEUP_DISCOVERY_STABLE;
       }
       break;
 
     case WAKEUP_DISCOVERY_STABLE:
-      if (isCoordinator && !autoCalibrationTriggered && (now - bootMs >= WAKEUP_WINDOW_MS + 500)) {
+      // Wait until WAKEUP_WINDOW + 500ms before triggering calibration.
+      // Do NOT transition to RUN until the time has elapsed.
+      if (now - bootMs < WAKEUP_WINDOW_MS + 500) {
+        return;  // Stay in this state until ready
+      }
+      if (isCoordinator && !autoCalibrationTriggered) {
+        Serial.println("Starting calibration...");
         autoCalibrationTriggered = true;
         uint16_t sessionId = (uint16_t)(millis() & 0xFFFF);
         uint16_t startDelayTick10 = encodeCalTick(DEFAULT_START_DELAY_MS);

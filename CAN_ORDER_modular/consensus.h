@@ -221,11 +221,11 @@ inline bool allGainsReceived() {
 // Main service routine: handles the gain-exchange phase then iterates
 // the consensus algorithm at CONSENSUS_PERIOD_MS intervals.
 inline void serviceConsensus() {
-  if (cons.mode != ALG_CONSENSUS || startupState != STARTUP_READY) return;
+  if (startupState != STARTUP_READY) return;
 
   uint32_t now = millis();
 
-  // Gain exchange phase: broadcast gains after calibration
+  // Gain exchange phase: runs regardless of algorithm mode since all need K
   if (!cons.gainsExchanged && calib.gainsReady) {
     if (cons.gainExchStartMs == 0) {
       cons.gainExchStartMs = now;
@@ -244,6 +244,7 @@ inline void serviceConsensus() {
         lastGainSend = now;
       }
       if (allGainsReceived()) {
+        Serial.println("Gain exchange complete. System ready.");
         cons.gainsExchanged = true;
         if (cons.mode == ALG_CONSENSUS) initConsensus();
         if (cons.mode == ALG_ADMM) initADMM();
@@ -258,6 +259,8 @@ inline void serviceConsensus() {
     if (cons.mode == ALG_DUAL_DECOMP) initDualDecomp();
   }
 
+  // Consensus iterations only run in consensus mode
+  if (cons.mode != ALG_CONSENSUS) return;
   if (!cons.active) return;
   if (cons.converged && cons.iteration >= CONS_MAX_ITER) return;
 

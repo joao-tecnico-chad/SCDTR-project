@@ -146,7 +146,9 @@ inline bool parseGetCommand(const char *line) {
         Serial.print(" ");
         Serial.print(i);
         Serial.print(" ");
-        Serial.println(occupancyState);
+        Serial.print(occupancyState);
+        printQueryLabel('o');
+        Serial.println();
         return true;
       }
 
@@ -161,12 +163,16 @@ inline bool parseGetCommand(const char *line) {
       Serial.print(i);
       Serial.print(" ");
       if (a == 'u') {
-        Serial.println(value, 0);
+        Serial.print(value, 0);
       } else if (a == 'a' || a == 'f') {
-        Serial.println((int)value);
+        Serial.print((int)value);
+      } else if (a == 'E' || a == 'V' || a == 'F') {
+        Serial.print(value, 6);  // 6 decimal places for metrics
       } else {
-        Serial.println(value, 3);
+        Serial.print(value, 3);
       }
+      printQueryLabel(a);
+      Serial.println();
       return true;
     }
 
