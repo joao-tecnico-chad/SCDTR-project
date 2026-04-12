@@ -2,7 +2,7 @@
 __pycache__/
 *.pyc
 .claude/
-*.pdf
+
 *.aux
 *.log
 *.out
