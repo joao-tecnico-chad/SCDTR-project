@@ -247,7 +247,7 @@ The optimisation problem minimises total weighted energy $\sum c_i d_i$ subject 
 
 Three metrics are computed at each 10\,ms cycle: \emph{energy} (accumulated power$\times$time), \emph{visibility error} (average illuminance deficit below reference), and \emph{flicker} (duty-cycle direction reversals). A dedicated \texttt{RM} command resets all accumulators, enabling fair per-algorithm comparison.
 
-All four algorithms were tested with equal costs $c{=}[1,1,1]$, $L_{\text{ref}}{=}20$\,lux, and metrics reset before each 20-second window. All converge to the same operating point (Table~\ref{tab:equal}), confirming the unique feasible minimum. Visibility error is below 0.026\,lux and flicker is zero in steady state, with total energy ${\sim}28.3$\,J. Consensus proved most robust during testing; ADMM and dual decomposition showed sensitivity to rapid algorithm switching.
+All four algorithms were tested with equal costs $c{=}[1,1,1]$, $L_{\text{ref}}{=}20$\,lux, and metrics reset before each 20-second window. All converge to the same operating point (Table~\ref{tab:equal}), confirming the unique feasible minimum. Visibility error is below 0.026\,lux, flicker is ${\sim}0.0003$\,s$^{-1}$ in steady state (negligible duty-cycle oscillation), and total energy is ${\sim}28.3$\,J. Consensus proved most robust during testing; ADMM and dual decomposition showed sensitivity to rapid algorithm switching.
 
 \begin{table}[H]
 \centering

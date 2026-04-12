@@ -250,6 +250,8 @@ inline void handleReplyFrame(uint8_t packetSize, const uint8_t *data) {
     Serial.print((int)payload.f);
   } else if (code == 'u') {
     Serial.print(payload.f, 0);
+  } else if (code == 'E' || code == 'V' || code == 'F') {
+    Serial.print(payload.f, 6);
   } else {
     Serial.print(payload.f, 3);
   }
