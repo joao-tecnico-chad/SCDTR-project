@@ -1,4 +1,4 @@
-# 10 - Oral Exam Cheat Sheet
+		# 10 - Oral Exam Cheat Sheet
 
 > [!abstract] Summary
 > Everything you need in one place. Ready-made answers to 25+ likely questions, the 9 numbers to know cold, diagrams to draw on a whiteboard, things to NOT say, and edge-case questions with tricky but correct answers.
@@ -12,9 +12,11 @@ Back to [[SCDEEC Home]]
 | What | Value | Memorization tip |
 |------|-------|-----------------|
 | Control loop rate | **100 Hz / 10 ms** | "100 times per second" |
+| PWM frequency | **45 kHz** | ">10x the LDR RC filter cutoff" |
 | CAN bus speed | **500 kbps** | Standard automotive CAN |
 | Calibration time | **~4.15 s** | 850 ms baseline + 3×1100 ms |
 | Step response | **< 100 ms** | "One control cycle with feedforward" |
+| Steady-state flicker | **~0.0003 s⁻¹** | "Negligible duty oscillation" |
 | Model R² | **0.977 – 0.993** | "Over 97% linear" |
 | PI Kp | **0.01** | Small — feedforward handles the bulk |
 | PI Ki | **0.11** | Integral corrects residual |

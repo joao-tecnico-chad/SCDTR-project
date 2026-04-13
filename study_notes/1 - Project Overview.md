@@ -177,7 +177,7 @@ $$F = \sum_k |\Delta d_k| + |\Delta d_{k-1}| \text{ when direction changes}$$
 > To compare them in practice. With equal cost coefficients, all three should converge to the same operating point — that validates correctness. Then we observe differences in convergence speed, robustness, and sensitivity to step size / penalty parameters. Consensus ADMM proved most robust in our system.
 
 > [!question] "What are the metrics you use to evaluate performance?"
-> Energy (accumulated electrical energy in joules), visibility error (average lux deficit below reference, should be near zero), and flicker (duty cycle direction reversals, should be zero in steady state).
+> Energy (accumulated electrical energy in joules), visibility error (average lux deficit below reference, should be near zero), and flicker (duty cycle direction reversals, ~0.0003 s⁻¹ in steady state — negligible).
 
 > [!question] "Why is the cross-coupling weak in your box?"
 > The LEDs are mounted in 3D-printed fixtures on the box ceiling that constrain the light beam. Each LED primarily illuminates the desk directly below it. The physical distance and angle between nodes limits how much light one LED contributes to a non-adjacent sensor.

@@ -75,7 +75,7 @@ CAN_L ──┘                                                  → RX Buffer 1
 A standard white LED. In the context of this project, it's a **luminaire** — a light source mounted to illuminate a desk.
 
 ### How is it driven?
-Via **PWM (Pulse-Width Modulation)**. The Pico's GPIO pin switches the LED on and off at high frequency (much faster than the eye can see, so it looks like a constant brightness). The fraction of time it's on is the **duty cycle**:
+Via **PWM (Pulse-Width Modulation)** at **45 kHz**. The Pico's GPIO pin switches the LED on and off at this frequency (much faster than the eye can see, so it looks like a constant brightness). 45 kHz is >10x the LDR RC filter cutoff (~160 Hz), preventing PWM switching noise from corrupting the sensor readings. The fraction of time it's on is the **duty cycle**:
 - Duty = 0.0 → LED off
 - Duty = 0.5 → LED at 50% apparent brightness
 - Duty = 1.0 → LED fully on

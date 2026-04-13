@@ -247,11 +247,8 @@ Core 1: setup1()  [runs simultaneously]
   - attachInterrupt(CAN_INT, canIrqHandler, FALLING)
 
         │
-startupState = STARTUP_WAIT_NODE_ID
-        │ (user types "1", "2", or "3" over serial)
-        ▼
-startupState = STARTUP_WAIT_TOTAL_NODES
-        │ (user types "3")
+Auto-config: read flash UID → lookup table → nodeId assigned
+        │ (no manual input needed — prints "Auto-configured as Node X")
         ▼
 startupState = STARTUP_READY
         │

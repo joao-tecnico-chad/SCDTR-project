@@ -107,7 +107,7 @@ Ran each of the four control modes (PI Only, Consensus, ADMM, Dual Decomp) with 
 
 1. **All algorithms achieve ≈ 20 lux** at every node (within 0.1 lux)
 2. **Visibility error is near zero** for all (< 0.026 lux average deficit)
-3. **Zero flicker** in steady state — no LED oscillation
+3. **Near-zero flicker** (~0.0003 s⁻¹) in steady state — negligible duty oscillation
 4. **Duties are nearly identical** across algorithms (within 1%)
 5. **Energy totals** are nearly the same (within 5%)
 

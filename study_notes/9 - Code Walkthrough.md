@@ -11,20 +11,20 @@ Back to [[SCDEEC Home]]
 
 Unlike the old monolithic sketch, the modular version uses separate header files. All files are in `CAN_ORDER_modular/`:
 
-| File | Responsibility | Key functions |
-|------|---------------|---------------|
-| `CAN_ORDER_modular.ino` | Entry point, global variables, Core 1 CAN service | `setup()`, `loop()`, `setup1()`, `loop1()`, `drainCanRxCore1()` |
-| `hardware_config.h` | All constants: pins, timing, gains, IDs | Constants only |
-| `protocol_defs.h` | Enums, structs, extern declarations | All type definitions |
-| `sensing.h` | LDR → lux conversion, LED PWM, peer table | `readLuxFiltered()`, `setLedPwm()`, `updatePeer()` |
-| `can_transport.h` | FIFO packing/unpacking, TX/RX queues, frame builders | `enqueueTxFrame()`, `serviceFifoFromCore1()`, `sendHelloFrame()` |
-| `calibration.h` | Calibration FSM, wakeup FSM, plan broadcast | `serviceCalibrationStateMachine()`, `serviceWakeupStateMachine()` |
-| `consensus.h` | Consensus algorithm + gain exchange | `solveLocalConsensus()`, `serviceConsensus()`, `sendGainRow()` |
-| `admm.h` | ADMM algorithm | `admmUpdateD()`, `admmUpdateZ()`, `admmUpdateU()`, `serviceADMM()` |
-| `dual_decomp.h` | Dual decomposition algorithm | `ddUpdatePrimal()`, `ddUpdateDual()`, `serviceDualDecomp()` |
-| `can_protocol.h` | Receive frame dispatch | `handleReceivedCanFrame()`, all `handle*Frame()` functions |
-| `control.h` | PI controller, hello, streaming, diagnostics | `runControlStep()`, `servicePeriodicHello()` |
-| `serial_ui.h` | Serial command parser | `handleLineCommand()`, `serviceSerialNonblocking()` |
+| File                    | Responsibility                                       | Key functions                                                      |
+| ----------------------- | ---------------------------------------------------- | ------------------------------------------------------------------ |
+| `CAN_ORDER_modular.ino` | Entry point, global variables, Core 1 CAN service    | `setup()`, `loop()`, `setup1()`, `loop1()`, `drainCanRxCore1()`    |
+| `hardware_config.h`     | All constants: pins, timing, gains, IDs              | Constants only                                                     |
+| `protocol_defs.h`       | Enums, structs, extern declarations                  | All type definitions                                               |
+| `sensing.h`             | LDR → lux conversion, LED PWM, peer table            | `readLuxFiltered()`, `setLedPwm()`, `updatePeer()`                 |
+| `can_transport.h`       | FIFO packing/unpacking, TX/RX queues, frame builders | `enqueueTxFrame()`, `serviceFifoFromCore1()`, `sendHelloFrame()`   |
+| `calibration.h`         | Calibration FSM, wakeup FSM, plan broadcast          | `serviceCalibrationStateMachine()`, `serviceWakeupStateMachine()`  |
+| `consensus.h`           | Consensus algorithm + gain exchange                  | `solveLocalConsensus()`, `serviceConsensus()`, `sendGainRow()`     |
+| `admm.h`                | ADMM algorithm                                       | `admmUpdateD()`, `admmUpdateZ()`, `admmUpdateU()`, `serviceADMM()` |
+| `dual_decomp.h`         | Dual decomposition algorithm                         | `ddUpdatePrimal()`, `ddUpdateDual()`, `serviceDualDecomp()`        |
+| `can_protocol.h`        | Receive frame dispatch                               | `handleReceivedCanFrame()`, all `handle*Frame()` functions         |
+| `control.h`             | PI controller, hello, streaming, diagnostics         | `runControlStep()`, `servicePeriodicHello()`                       |
+| `serial_ui.h`           | Serial command parser                                | `handleLineCommand()`, `serviceSerialNonblocking()`                |
 
 ---
 
@@ -260,7 +260,7 @@ For `g` (get) commands targeting a remote node, it sends a CAN query and registe
 | `S y <n>` | Stop lux stream |
 | `b` | Print recent history buffer (600 samples at 100 Hz = 6 s) |
 | `help` / `h` / `?` | Print help text |
-
+	
 ---
 
 ## How to Navigate the Code During Presentation
